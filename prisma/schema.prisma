@@ -1,0 +1,380 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  BUSINESS_OWNER
+  BRANCH_MANAGER
+  EMPLOYEE
+  CUSTOMER
+}
+
+enum VehicleType {
+  MOTORCYCLE
+  HATCHBACK
+  SEDAN
+  SUV
+  LUXURY
+  TRUCK
+  OTHER
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CHECKED_IN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum QueueStatus {
+  WAITING
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  UPI
+  ONLINE
+}
+
+enum LoyaltyTier {
+  SILVER
+  GOLD
+  PLATINUM
+}
+
+model User {
+  id           String        @id @default(uuid())
+  email        String        @unique
+  password     String
+  role         Role          @default(CUSTOMER)
+  fullName     String
+  phone        String?
+  businessId   String?
+  branchId     String?
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  business     Business?     @relation(fields: [businessId], references: [id], onDelete: SetNull)
+  branch       Branch?       @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  refreshTokens RefreshToken[]
+  customer     Customer?
+  employee     Employee?
+
+  @@index([businessId])
+  @@index([branchId])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isRevoked Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Business {
+  id         String   @id @default(uuid())
+  name       String
+  logo       String?
+  email      String
+  phone      String
+  address    String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  users          User[]
+  branches       Branch[]
+  customers      Customer[]
+  services       Service[]
+  packages       ServicePackage[]
+  bookings       Booking[]
+  employees      Employee[]
+  payments       Payment[]
+  inventoryItems InventoryItem[]
+}
+
+model Branch {
+  id             String          @id @default(uuid())
+  businessId     String
+  business       Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name           String
+  address        String
+  phone          String
+  operatingHours String?
+  capacity       Int             @default(5)
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  users          User[]
+  employees      Employee[]
+  bookings       Booking[]
+  queueItems     QueueItem[]
+  inventoryItems InventoryItem[]
+
+  @@index([businessId])
+}
+
+model Customer {
+  id          String   @id @default(uuid())
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  userId      String?  @unique
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  name        String
+  phone       String
+  email       String?
+  address     String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  vehicles       Vehicle[]
+  bookings       Booking[]
+  loyaltyAccount LoyaltyAccount?
+
+  @@index([businessId])
+}
+
+model Vehicle {
+  id          String      @id @default(uuid())
+  customerId  String
+  customer    Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  plateNumber String
+  brand       String
+  model       String
+  color       String?
+  vehicleType VehicleType @default(SEDAN)
+  year        Int?
+  notes       String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  bookings   Booking[]
+  queueItems QueueItem[]
+
+  @@index([customerId])
+}
+
+model Service {
+  id                     String           @id @default(uuid())
+  businessId             String
+  business               Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name                   String
+  description            String?
+  price                  Float
+  estimatedDurationMinutes Int            @default(30)
+  supportedVehicleTypes  String?
+  isActive               Boolean          @default(true)
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+
+  packageServices PackageService[]
+  bookingServices BookingService[]
+
+  @@index([businessId])
+}
+
+model ServicePackage {
+  id                     String           @id @default(uuid())
+  businessId             String
+  business               Business         @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name                   String
+  description            String?
+  price                  Float
+  estimatedDurationMinutes Int            @default(60)
+  isActive               Boolean          @default(true)
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+
+  packageServices PackageService[]
+  bookingServices BookingService[]
+
+  @@index([businessId])
+}
+
+model PackageService {
+  packageId String
+  package   ServicePackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  serviceId String
+  service   Service        @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@id([packageId, serviceId])
+}
+
+model Booking {
+  id            String        @id @default(uuid())
+  businessId    String
+  business      Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  branchId      String
+  branch        Branch        @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  customerId    String
+  customer      Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  vehicleId     String
+  vehicle       Vehicle       @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  bookingDate   DateTime
+  timeSlot      String
+  status        BookingStatus @default(PENDING)
+  totalAmount   Float
+  paymentStatus PaymentStatus @default(PENDING)
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  bookingServices BookingService[]
+  queueItem       QueueItem?
+  payments        Payment[]
+
+  @@index([businessId])
+  @@index([branchId])
+  @@index([customerId])
+}
+
+model BookingService {
+  id        String          @id @default(uuid())
+  bookingId String
+  booking   Booking         @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  serviceId String?
+  service   Service?        @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+  packageId String?
+  package   ServicePackage? @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  price     Float
+}
+
+model QueueItem {
+  id                   String        @id @default(uuid())
+  branchId             String
+  branch               Branch        @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  bookingId            String?       @unique
+  booking              Booking?      @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  vehicleId            String
+  vehicle              Vehicle       @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  queueNumber          Int
+  priority             Int           @default(0)
+  status               QueueStatus   @default(WAITING)
+  assignedEmployeeId   String?
+  assignedEmployee     Employee?     @relation(fields: [assignedEmployeeId], references: [id], onDelete: SetNull)
+  estimatedWaitMinutes Int           @default(0)
+  arrivalTime          DateTime      @default(now())
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  workflowAudits WorkflowAudit[]
+
+  @@index([branchId])
+}
+
+model WorkflowAudit {
+  id             String    @id @default(uuid())
+  queueItemId    String
+  queueItem      QueueItem @relation(fields: [queueItemId], references: [id], onDelete: Cascade)
+  previousStatus String?
+  newStatus      String
+  updatedById    String?
+  notes          String?
+  timestamp      DateTime  @default(now())
+
+  @@index([queueItemId])
+}
+
+model Employee {
+  id               String      @id @default(uuid())
+  businessId       String
+  business         Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  branchId         String
+  branch           Branch      @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  userId           String      @unique
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  employmentStatus String      @default("ACTIVE")
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  assignedQueueItems QueueItem[]
+
+  @@index([businessId])
+  @@index([branchId])
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  businessId    String
+  business      Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  bookingId     String
+  booking       Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  amount        Float
+  paymentMethod PaymentMethod @default(CASH)
+  status        PaymentStatus @default(PENDING)
+  transactionId String?
+  createdAt     DateTime      @default(now())
+
+  @@index([businessId])
+  @@index([bookingId])
+}
+
+model LoyaltyAccount {
+  id            String      @id @default(uuid())
+  customerId    String      @unique
+  customer      Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  pointsBalance Int         @default(0)
+  tier          LoyaltyTier @default(SILVER)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model InventoryItem {
+  id            String   @id @default(uuid())
+  businessId    String
+  business      Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  branchId      String
+  branch        Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  name          String
+  sku           String
+  quantity      Int      @default(0)
+  minStockLevel Int      @default(10)
+  unitPrice     Float    @default(0.0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([businessId])
+  @@index([branchId])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  message   String
+  type      String   @default("INFO")
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
