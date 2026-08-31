@@ -1,7 +1,7 @@
 import { prisma } from '../../config/db';
 import { ApiError } from '../../utils/apiError';
 import { CreateBookingInput, UpdateBookingStatusInput } from './booking.schema';
-import { BookingStatus, QueueStatus } from '@prisma/client';
+import { BookingStatus, QueueStatus, ServiceLocationType } from '@prisma/client';
 
 export class BookingService {
   /**
@@ -24,7 +24,13 @@ export class BookingService {
       throw ApiError.forbidden('Access denied to create booking for this business branch');
     }
 
-    // 2. Validate customer & vehicle
+    // 2. Validate doorstep home wash location requirements
+    const isDoorstep = input.locationType === ServiceLocationType.DOORSTEP_HOME;
+    if (isDoorstep && (!input.address || input.address.trim().length === 0)) {
+      throw ApiError.badRequest('Home address is required for Doorstep Home Car Wash appointments');
+    }
+
+    // 3. Validate customer & vehicle
     const customer = await prisma.customer.findUnique({ where: { id: input.customerId } });
     if (!customer) throw ApiError.notFound('Customer not found');
 
@@ -33,7 +39,7 @@ export class BookingService {
       throw ApiError.badRequest('Vehicle not found or does not belong to customer');
     }
 
-    // 3. Prevent Overbooking: Count existing active bookings for slot
+    // 4. Prevent Overbooking: Count existing active bookings for slot
     const bookingDateObj = new Date(input.bookingDate);
     const startOfDay = new Date(bookingDateObj);
     startOfDay.setHours(0, 0, 0, 0);
@@ -53,8 +59,8 @@ export class BookingService {
       throw ApiError.conflict(`Time slot '${input.timeSlot}' has reached maximum branch capacity (${branch.capacity})`);
     }
 
-    // 4. Calculate Total Price & Fetch Selected Services / Package
-    let totalAmount = 0;
+    // 5. Calculate Total Price & Fetch Selected Services / Package
+    let totalAmount = input.doorstepFee || 0;
     const servicesToAttach: { serviceId?: string; packageId?: string; price: number }[] = [];
 
     if (input.packageId) {
@@ -83,13 +89,17 @@ export class BookingService {
       throw ApiError.badRequest('At least one service or service package must be selected');
     }
 
-    // 5. Create Booking Record
+    // 6. Create Booking Record
     const booking = await prisma.booking.create({
       data: {
         businessId,
         branchId: input.branchId,
         customerId: input.customerId,
         vehicleId: input.vehicleId,
+        locationType: input.locationType || ServiceLocationType.IN_BRANCH,
+        address: isDoorstep ? input.address?.trim() : null,
+        landmark: isDoorstep ? input.landmark?.trim() : null,
+        doorstepFee: input.doorstepFee || 0,
         bookingDate: bookingDateObj,
         timeSlot: input.timeSlot,
         totalAmount,
@@ -101,8 +111,8 @@ export class BookingService {
       },
       include: {
         customer: { select: { id: true, name: true, phone: true } },
-        vehicle: { select: { id: true, plateNumber: true, brand: true, model: true } },
-        branch: { select: { id: true, name: true } },
+        vehicle: { select: { id: true, plateNumber: true, brand: true, model: true, vehicleType: true } },
+        branch: { select: { id: true, name: true, address: true } },
         bookingServices: { include: { service: true, package: true } },
       },
     });
@@ -148,8 +158,8 @@ export class BookingService {
         orderBy: { bookingDate: 'desc' },
         include: {
           customer: { select: { id: true, name: true, phone: true } },
-          vehicle: { select: { id: true, plateNumber: true, brand: true, model: true } },
-          branch: { select: { id: true, name: true } },
+          vehicle: { select: { id: true, plateNumber: true, brand: true, model: true, vehicleType: true } },
+          branch: { select: { id: true, name: true, address: true } },
           bookingServices: { include: { service: true, package: true } },
         },
       }),

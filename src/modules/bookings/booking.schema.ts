@@ -1,11 +1,15 @@
 import { z } from 'zod';
-import { BookingStatus, PaymentStatus } from '@prisma/client';
+import { BookingStatus, PaymentStatus, ServiceLocationType } from '@prisma/client';
 
 export const createBookingSchema = z.object({
   body: z.object({
     branchId: z.string().uuid('Invalid Branch ID'),
     customerId: z.string().uuid('Invalid Customer ID'),
     vehicleId: z.string().uuid('Invalid Vehicle ID'),
+    locationType: z.nativeEnum(ServiceLocationType).optional().default(ServiceLocationType.IN_BRANCH),
+    address: z.string().optional(),
+    landmark: z.string().optional(),
+    doorstepFee: z.number().nonnegative().optional().default(0),
     bookingDate: z.string().datetime('Invalid booking date format (ISO 8601 string required)'),
     timeSlot: z.string().min(1, 'Time slot is required (e.g., "10:00 AM - 10:30 AM")'),
     serviceIds: z.array(z.string().uuid()).optional().default([]),
