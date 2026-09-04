@@ -9,6 +9,8 @@ export const registerSchema = z.object({
     phone: z.string().optional(),
     role: z.nativeEnum(Role).optional().default(Role.CUSTOMER),
     businessName: z.string().optional(), // Provided when BUSINESS_OWNER registers
+    businessPhone: z.string().optional(),
+    branchAddress: z.string().optional(), // Primary branch address for business
     businessId: z.string().optional(),   // Provided when registering for a specific business
     branchId: z.string().optional(),     // Provided when registering for a specific branch
   }),

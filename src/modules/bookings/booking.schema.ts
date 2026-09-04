@@ -3,24 +3,24 @@ import { BookingStatus, PaymentStatus, ServiceLocationType } from '@prisma/clien
 
 export const createBookingSchema = z.object({
   body: z.object({
-    branchId: z.string().uuid('Invalid Branch ID'),
-    customerId: z.string().uuid('Invalid Customer ID'),
-    vehicleId: z.string().uuid('Invalid Vehicle ID'),
+    branchId: z.string().min(1, 'Branch or Business ID is required'),
+    customerId: z.string().min(1, 'Customer ID is required'),
+    vehicleId: z.string().optional().default(''),
     locationType: z.nativeEnum(ServiceLocationType).optional().default(ServiceLocationType.IN_BRANCH),
     address: z.string().optional(),
     landmark: z.string().optional(),
     doorstepFee: z.number().nonnegative().optional().default(0),
-    bookingDate: z.string().datetime('Invalid booking date format (ISO 8601 string required)'),
-    timeSlot: z.string().min(1, 'Time slot is required (e.g., "10:00 AM - 10:30 AM")'),
-    serviceIds: z.array(z.string().uuid()).optional().default([]),
-    packageId: z.string().uuid().optional(),
+    bookingDate: z.string().min(1, 'Booking date is required'),
+    timeSlot: z.string().min(1, 'Time slot is required'),
+    serviceIds: z.array(z.string()).optional().default([]),
+    packageId: z.string().optional(),
     notes: z.string().optional(),
   }),
 });
 
 export const updateBookingStatusSchema = z.object({
   params: z.object({
-    id: z.string().uuid('Invalid Booking ID format'),
+    id: z.string().min(1, 'Booking ID is required'),
   }),
   body: z.object({
     status: z.nativeEnum(BookingStatus).optional(),
@@ -31,14 +31,14 @@ export const updateBookingStatusSchema = z.object({
 
 export const getBookingParamsSchema = z.object({
   params: z.object({
-    id: z.string().uuid('Invalid Booking ID format'),
+    id: z.string().min(1, 'Booking ID is required'),
   }),
 });
 
 export const getBookingsQuerySchema = z.object({
   query: z.object({
-    branchId: z.string().uuid().optional(),
-    customerId: z.string().uuid().optional(),
+    branchId: z.string().optional(),
+    customerId: z.string().optional(),
     status: z.nativeEnum(BookingStatus).optional(),
     date: z.string().optional(),
     page: z.string().optional(),

@@ -29,7 +29,7 @@ export class AuthService {
   }
 
   /**
-   * Register a new User & automatically link Business/Customer entity if applicable
+   * Register a new User & automatically link Business/Branch entity if applicable
    */
   static async register(input: RegisterInput) {
     const existingUser = await prisma.user.findUnique({
@@ -43,17 +43,32 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(input.password, 12);
 
     let businessId: string | undefined = input.businessId;
+    let branchId: string | undefined = input.branchId;
 
-    // If role is BUSINESS_OWNER, create a default Business entry
-    if (input.role === Role.BUSINESS_OWNER && input.businessName) {
+    // If role is BUSINESS_OWNER, create Business entry and primary Branch automatically!
+    if (input.role === Role.BUSINESS_OWNER) {
+      const bName = input.businessName?.trim() || `${input.fullName}'s Car Wash`;
       const business = await prisma.business.create({
         data: {
-          name: input.businessName,
+          name: bName,
           email: input.email,
-          phone: input.phone || '',
+          phone: input.businessPhone || input.phone || '',
+          address: input.branchAddress || undefined,
         },
       });
       businessId = business.id;
+
+      // Automatically create Primary Branch for the Business
+      const branch = await prisma.branch.create({
+        data: {
+          businessId: business.id,
+          name: `${bName} - Main Branch`,
+          address: input.branchAddress?.trim() || 'Main Branch Location',
+          phone: input.phone || business.phone,
+          capacity: 5,
+        },
+      });
+      branchId = branch.id;
     }
 
     // Create User
@@ -65,24 +80,21 @@ export class AuthService {
         phone: input.phone,
         role: input.role || Role.CUSTOMER,
         businessId: businessId || null,
-        branchId: input.branchId || null,
+        branchId: branchId || null,
       },
     });
 
-    // If CUSTOMER role, automatically create Customer record
-    if (user.role === Role.CUSTOMER) {
-      // If no businessId yet, user will be associated with tenant upon business context
-      if (businessId) {
-        await prisma.customer.create({
-          data: {
-            businessId,
-            userId: user.id,
-            name: user.fullName,
-            email: user.email,
-            phone: user.phone || '',
-          },
-        });
-      }
+    // Create Customer profile record
+    if (businessId) {
+      await prisma.customer.create({
+        data: {
+          businessId,
+          userId: user.id,
+          name: user.fullName,
+          email: user.email,
+          phone: user.phone || '',
+        },
+      });
     }
 
     const payload: JwtPayload = {
@@ -243,10 +255,10 @@ export class AuthService {
         isActive: true,
         createdAt: true,
         business: {
-          select: { id: true, name: true, logo: true },
+          select: { id: true, name: true, logo: true, phone: true, address: true },
         },
         branch: {
-          select: { id: true, name: true },
+          select: { id: true, name: true, address: true, phone: true },
         },
       },
     });

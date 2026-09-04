@@ -33,13 +33,21 @@ export class ServiceCatalogService {
   }
 
   /**
-   * List Services for a Business
+   * List Services for a Business (or all active services if businessId is omitted)
    */
-  static async getServicesByBusiness(businessId: string, includeInactive = false) {
+  static async getServicesByBusiness(businessId?: string, includeInactive = false) {
+    const whereClause: any = {
+      ...(includeInactive ? {} : { isActive: true }),
+    };
+
+    if (businessId) {
+      whereClause.businessId = businessId;
+    }
+
     const services = await prisma.service.findMany({
-      where: {
-        businessId,
-        ...(includeInactive ? {} : { isActive: true }),
+      where: whereClause,
+      include: {
+        business: { select: { id: true, name: true, phone: true, address: true } },
       },
       orderBy: { name: 'asc' },
     });
@@ -119,12 +127,14 @@ export class ServiceCatalogService {
   /**
    * List Service Packages for a Business
    */
-  static async getPackagesByBusiness(businessId: string, includeInactive = false) {
+  static async getPackagesByBusiness(businessId?: string, includeInactive = false) {
+    const whereClause: any = {
+      ...(includeInactive ? {} : { isActive: true }),
+    };
+    if (businessId) whereClause.businessId = businessId;
+
     const packages = await prisma.servicePackage.findMany({
-      where: {
-        businessId,
-        ...(includeInactive ? {} : { isActive: true }),
-      },
+      where: whereClause,
       include: {
         packageServices: {
           include: {
@@ -180,7 +190,6 @@ export class ServiceCatalogService {
 
     const updated = await prisma.$transaction(async (tx) => {
       if (serviceIds) {
-        // Clear existing package services and replace
         await tx.packageService.deleteMany({ where: { packageId: id } });
         await tx.packageService.createMany({
           data: serviceIds.map((serviceId) => ({

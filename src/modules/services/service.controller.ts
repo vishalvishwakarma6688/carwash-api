@@ -15,16 +15,9 @@ export const createService = asyncHandler(async (req: Request, res: Response) =>
 });
 
 export const getServicesByBusiness = asyncHandler(async (req: Request, res: Response) => {
-  const businessId = (req.query.businessId as string) || req.user?.businessId;
-  if (!businessId) {
-    return sendResponse({
-      res,
-      statusCode: HTTP_STATUS.BAD_REQUEST,
-      message: 'Business ID query parameter is required',
-    });
-  }
-
+  const businessId = (req.query.businessId as string) || req.user?.businessId || undefined;
   const includeInactive = req.query.includeInactive === 'true';
+
   const services = await ServiceCatalogService.getServicesByBusiness(businessId, includeInactive);
 
   return sendResponse({
@@ -75,16 +68,9 @@ export const createPackage = asyncHandler(async (req: Request, res: Response) =>
 });
 
 export const getPackagesByBusiness = asyncHandler(async (req: Request, res: Response) => {
-  const businessId = (req.query.businessId as string) || req.user?.businessId;
-  if (!businessId) {
-    return sendResponse({
-      res,
-      statusCode: HTTP_STATUS.BAD_REQUEST,
-      message: 'Business ID query parameter is required',
-    });
-  }
-
+  const businessId = (req.query.businessId as string) || req.user?.businessId || undefined;
   const includeInactive = req.query.includeInactive === 'true';
+
   const packages = await ServiceCatalogService.getPackagesByBusiness(businessId, includeInactive);
 
   return sendResponse({

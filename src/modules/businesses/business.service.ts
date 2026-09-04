@@ -54,6 +54,16 @@ export class BusinessService {
             isActive: true,
           },
         },
+        services: {
+          where: { isActive: true },
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            price: true,
+            estimatedDurationMinutes: true,
+          },
+        },
         _count: {
           select: {
             branches: true,
@@ -73,9 +83,9 @@ export class BusinessService {
   }
 
   /**
-   * List all Businesses (Super Admin access)
+   * List all Businesses with Branches & Services for Customer Selection
    */
-  static async getAllBusinesses(page = 1, limit = 10) {
+  static async getAllBusinesses(page = 1, limit = 20) {
     const skip = (page - 1) * limit;
     const [total, businesses] = await Promise.all([
       prisma.business.count(),
@@ -84,8 +94,27 @@ export class BusinessService {
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
+          branches: {
+            select: {
+              id: true,
+              name: true,
+              address: true,
+              phone: true,
+              capacity: true,
+            },
+          },
+          services: {
+            where: { isActive: true },
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              price: true,
+              estimatedDurationMinutes: true,
+            },
+          },
           _count: {
-            select: { branches: true, customers: true, employees: true },
+            select: { branches: true, customers: true, employees: true, services: true },
           },
         },
       }),

@@ -26,11 +26,8 @@ router.post(
   createBusiness
 );
 
-router.get(
-  '/',
-  authorizeRoles(Role.SUPER_ADMIN),
-  getAllBusinesses
-);
+// All authenticated users (customers & owners) can list registered car wash businesses
+router.get('/', getAllBusinesses);
 
 router.get(
   '/:id',
